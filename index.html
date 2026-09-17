@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="millionalite — 大富豪 × ローグライトのブラウザカードゲーム">
+<title>millionalite</title>
+<style>
+/* =========================================================
+   millionalite — 薄暗い酒場のカードテーブル
+   Phase 0: 骨組み + タイトル画面
+   ========================================================= */
+
+/* ---- デザイントークン ---- */
+:root {
+  --bg:        #0a0805;  /* 酒場の闇 */
+  --bg-raise:  #141009;  /* 卓上 */
+  --bg-panel:  #1b1510;
+  --gold:      #c9a961;  /* 燭台の金 */
+  --gold-dim:  #8a7340;
+  --gold-hi:   #f0d89a;
+  --blood:     #8b2e2e;  /* 血赤 */
+  --blood-hi:  #c2494a;
+  --ink:       #e8dcc4;  /* 羊皮紙の文字 */
+  --ink-dim:   #96876c;
+  --line:      #3a2f22;
+
+  --font-title: "Cinzel", "Times New Roman", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-body:  "Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", Georgia, serif;
+
+  --gutter: 16px;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  overscroll-behavior: none;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/* 燭台の灯り + 木目のような粒状ノイズ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 38%, rgba(201,169,97,.10), transparent 70%),
+    radial-gradient(ellipse 120% 90% at 50% 50%, transparent 40%, rgba(0,0,0,.75) 100%);
+}
+
+/* ---- 画面切り替え ---- */
+.screen {
+  display: none;
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  flex-direction: column;
+  padding: 24px var(--gutter);
+}
+.screen.active { display: flex; }
+
+/* ---- タイトル画面 ---- */
+#screen-title {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.title-mark {
+  font-size: clamp(28px, 9vw, 46px);
+  color: var(--blood-hi);
+  letter-spacing: .5em;
+  text-indent: .5em;
+  margin-bottom: 4px;
+  opacity: .85;
+}
+
+.logo {
+  font-family: var(--font-title);
+  font-size: clamp(30px, 9vw, 72px);
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-indent: .04em;
+  max-width: 100%;
+  margin: 0;
+  color: var(--gold);
+  text-shadow:
+     0 0 18px rgba(201,169,97,.35),
+     0 0 48px rgba(139,46,46,.28),
+     0 2px 0 #000;
+  animation: candle 5.5s ease-in-out infinite;
+}
+
+@keyframes candle {
+  0%, 100% { opacity: 1;    text-shadow: 0 0 18px rgba(201,169,97,.35), 0 0 48px rgba(139,46,46,.28), 0 2px 0 #000; }
+  45%      { opacity: .93;  text-shadow: 0 0 12px rgba(201,169,97,.22), 0 0 34px rgba(139,46,46,.20), 0 2px 0 #000; }
+  70%      { opacity: .98;  text-shadow: 0 0 22px rgba(201,169,97,.42), 0 0 56px rgba(139,46,46,.32), 0 2px 0 #000; }
+}
+
+.tagline {
+  color: var(--ink-dim);
+  font-size: clamp(12px, 3.4vw, 15px);
+  letter-spacing: .22em;
+  margin: 2px 0 6px;
+}
+
+.rule-line {
+  width: min(320px, 78vw);
+  height: 1px;
+  margin: 14px 0 26px;
+  background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+}
+
+/* ---- ボタン ---- */
+.menu { display: flex; flex-direction: column; gap: 12px; width: min(300px, 82vw); }
+
+.btn {
+  font-family: var(--font-body);
+  font-size: 16px;
+  letter-spacing: .12em;
+  padding: 13px 18px;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--bg-panel), #100c08);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: border-color .18s, color .18s, box-shadow .18s, transform .08s;
+}
+.btn:hover:not(:disabled) {
+  color: var(--gold-hi);
+  border-color: var(--gold-dim);
+  box-shadow: 0 0 16px rgba(201,169,97,.18), inset 0 0 22px rgba(201,169,97,.06);
+}
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.btn:disabled { opacity: .38; cursor: not-allowed; }
+
+.btn-primary {
+  color: var(--gold);
+  border-color: var(--gold-dim);
+  background: linear-gradient(180deg, #221a10, #140e08);
+  font-size: 18px;
+  padding: 15px 18px;
+}
+.btn-primary:hover { color: var(--gold-hi); border-color: var(--gold); }
+
+.version {
+  margin-top: 30px;
+  color: var(--ink-dim);
+  font-size: 11px;
+  letter-spacing: .16em;
+  opacity: .6;
+}
+
+/* ---- ゲーム画面の骨組み（Phase 1以降で中身を実装） ---- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--bg-raise);
+  font-size: 13px;
+  letter-spacing: .08em;
+}
+.topbar .coin { color: var(--gold); }
+
+.board {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 14px 0;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background:
+    radial-gradient(ellipse 60% 60% at 50% 45%, rgba(139,46,46,.10), transparent 70%),
+    var(--bg-raise);
+  color: var(--ink-dim);
+  min-height: 220px;
+}
+
+.hand { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; min-height: 92px; }
+.actions { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+
+/* ---- 右下のアライグマ / 左下のメモ帳（Phase 7で中身を実装） ---- */
+.corner {
+  position: fixed;
+  bottom: 12px;
+  z-index: 5;
+  width: 44px; height: 44px;
+  display: none;
+  align-items: center; justify-content: center;
+  font-size: 22px;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: .8;
+}
+.corner:hover { opacity: 1; border-color: var(--gold-dim); }
+#raccoon { right: 12px; }
+#notepad { left: 12px; }
+body.in-run .corner { display: flex; }
+
+/* ---- 汎用 ---- */
+.screen-title {
+  font-family: var(--font-title);
+  color: var(--gold);
+  font-size: clamp(20px, 6vw, 28px);
+  letter-spacing: .1em;
+  margin: 0 0 4px;
+  text-align: center;
+}
+.muted { color: var(--ink-dim); font-size: 13px; text-align: center; }
+.stack { display: flex; flex-direction: column; gap: 14px; align-items: center; justify-content: center; flex: 1; }
+</style>
+</head>
+<body>
+
+<!-- ============ タイトル画面 ============ -->
+<section id="screen-title" class="screen active">
+  <div class="title-mark">&spades; &hearts; &diams; &clubs;</div>
+  <h1 class="logo">millionalite</h1>
+  <p class="tagline">大富豪 &times; ローグライト</p>
+  <div class="rule-line"></div>
+  <nav class="menu">
+    <button class="btn btn-primary" id="btn-start">ゲーム開始</button>
+    <button class="btn" id="btn-decks" disabled>デッキ選択</button>
+    <button class="btn" id="btn-achievements" disabled>実績</button>
+    <button class="btn" id="btn-settings" disabled>設定</button>
+  </nav>
+  <p class="version">PHASE 0 &mdash; SETUP</p>
+</section>
+
+<!-- ============ ゲーム画面（骨組みのみ） ============ -->
+<section id="screen-game" class="screen">
+  <header class="topbar">
+    <span>ROUND <b id="ui-round">-</b> / 21</span>
+    <span>WAVE <b id="ui-wave">-</b></span>
+    <span class="coin">&#9679; <b id="ui-coins">0</b></span>
+  </header>
+  <div class="board" id="ui-board">— 場 —</div>
+  <div class="hand" id="ui-hand"></div>
+  <div class="actions">
+    <button class="btn" id="btn-play" disabled>出す</button>
+    <button class="btn" id="btn-pass" disabled>パス</button>
+  </div>
+</section>
+
+<!-- ============ 以降のPhaseで実装する画面 ============ -->
+<section id="screen-result" class="screen"><div class="stack"><h2 class="screen-title">ラウンド結果</h2><p class="muted">Phase 2 で実装</p></div></section>
+<section id="screen-shop" class="screen"><div class="stack"><h2 class="screen-title">ショップ</h2><p class="muted">Phase 3 で実装</p></div></section>
+<section id="screen-laundry" class="screen"><div class="stack"><h2 class="screen-title">コインランドリー</h2><p class="muted">Phase 6 で実装</p></div></section>
+<section id="screen-deckselect" class="screen"><div class="stack"><h2 class="screen-title">デッキ選択</h2><p class="muted">Phase 7 で実装</p></div></section>
+<section id="screen-achievements" class="screen"><div class="stack"><h2 class="screen-title">実績</h2><p class="muted">Phase 7 で実装</p></div></section>
+<section id="screen-gameover" class="screen"><div class="stack"><h2 class="screen-title">GAME OVER</h2><p class="muted">Phase 2 で実装</p></div></section>
+<section id="screen-clear" class="screen"><div class="stack"><h2 class="screen-title">CLEAR</h2><p class="muted">Phase 2 で実装</p></div></section>
+
+<!-- ============ 常駐UI（Phase 7） ============ -->
+<div class="corner" id="notepad" title="ログ">&#128220;</div>
+<div class="corner" id="raccoon" title="発動中の効果">&#129441;</div>
+
+<script>
+"use strict";
+/* =========================================================
+   millionalite
+   仕様は SPEC.md を参照。単一ファイル / 外部ライブラリなし。
+   Phase 0: 骨組みとタイトル画面のみ。
+   ========================================================= */
+
+/* ---------- 定数（SPEC: Chapter III / IV / V） ---------- */
+const SUITS = ["♥", "♠", "♦", "♣"];
+const RANK_ORDER = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 2, "JOKER"]; // 弱→強
+const TOTAL_ROUNDS = 21;
+const HAND_SIZE = 9;              // ラウンド開始時のみ配る。ウェーブごとの補充はしない
+const BOSS_ROUNDS = [3, 6, 9, 12, 15, 18, 21];
+const LAUNDRY_ROUNDS = [10, 20];  // このラウンド終了後に開店
+const REWARD = { 1: 40, 2: 30, 3: 20, 4: 10 }; // ボスラウンドは ×2
+const MARK_SOUL_PRICE = 40;
+const SEAL_PRICES = [15, 25, 35, 45];
+const LAUNDRY_BASE = 20, LAUNDRY_STEP = 5;     // 20 + 5×(枚数-1) の累積式
+const SAVE_KEY = "millionalite.save.v1";
+
+/* ---------- 永続データ（localStorage） ---------- */
+const DEFAULT_SAVE = {
+  unlockedDecks: ["standard_blue"],
+  achievements: {},
+  settings: { bgm: 0.6, se: 0.6, handStyle: "fan" }
+};
+
+const Save = {
+  data: structuredClone(DEFAULT_SAVE),
+  load() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (raw) this.data = Object.assign(structuredClone(DEFAULT_SAVE), JSON.parse(raw));
+    } catch (e) {
+      console.warn("セーブデータを読めませんでした。初期値で開始します。", e);
+    }
+    return this.data;
+  },
+  persist() {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(this.data));
+    } catch (e) {
+      console.warn("セーブデータを保存できませんでした。", e);
+    }
+  }
+};
+
+/* ---------- ランの状態（Phase 1以降で中身が埋まる） ---------- */
+const state = {
+  screen: "title",
+  deckId: "standard_blue",
+  round: 0,
+  wave: 0,
+  coins: 0,
+  deck: [],        // プレイヤーの山札
+  hands: [[], [], [], []], // 0 = プレイヤー, 1〜3 = CPU
+  field: null,     // 場のカード
+  ranks: [],       // 上がった順
+  marks: {},       // マークの素 → パッシブ
+  consumables: [], // 最大4個
+  log: []
+};
+
+/* ---------- 画面管理 ---------- */
+function showScreen(name) {
+  document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
+  const el = document.getElementById("screen-" + name);
+  if (!el) { console.warn("不明な画面:", name); return; }
+  el.classList.add("active");
+  state.screen = name;
+  window.scrollTo(0, 0);
+}
+
+/* ---------- ログ（Phase 7でメモ帳UIに繋ぐ） ---------- */
+function logEvent(text) {
+  state.log.push({ round: state.round, wave: state.wave, text });
+  console.log("[log]", text);
+}
+
+/* ---------- 以降のPhaseで実装する処理（空実装） ---------- */
+function buildDeck() { /* Phase 1 */ }
+function shuffle() { /* Phase 1 */ }
+function dealHands() { /* Phase 1 */ }
+function canPlay() { /* Phase 1 */ }
+function playCards() { /* Phase 1 */ }
+function passTurn() { /* Phase 1 */ }
+function cpuTurn() { /* Phase 1 */ }
+function endWave() { /* Phase 1 */ }
+function endRound() { /* Phase 2 */ }
+function openShop() { /* Phase 3 */ }
+function applyPassives() { /* Phase 4 */ }
+function setupBoss() { /* Phase 5 */ }
+function openLaundry() { /* Phase 6 */ }
+function checkAchievements() { /* Phase 7 */ }
+
+function startRun() {
+  console.log("start");
+  // Phase 1 以降でここからラウンド1を開始する
+}
+
+/* ---------- 起動 ---------- */
+function init() {
+  Save.load();
+  document.getElementById("btn-start").addEventListener("click", startRun);
+  showScreen("title");
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>
