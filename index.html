@@ -5,6 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="description" content="millionalite — 大富豪 × ローグライトのブラウザカードゲーム">
 <title>millionalite</title>
+<script>
+/* 読み込み中の失敗も画面に出せるよう、最初にエラーを拾っておく（スマホではコンソールが見られない） */
+window.__errors = [];
+function renderErrors() {
+  var bar = document.getElementById("errbar");
+  if (!bar || !window.__errors.length) return;
+  bar.hidden = false;
+  bar.textContent = "エラー: " + window.__errors.join(" / ");
+}
+function showError(message) {
+  window.__errors.push(String(message));
+  renderErrors();
+}
+window.addEventListener("error", function (e) {
+  showError((e.message || "不明なエラー") + (e.lineno ? " @" + e.lineno : ""));
+});
+window.addEventListener("unhandledrejection", function (e) {
+  showError("未処理の失敗: " + (e.reason || "不明"));
+});
+document.addEventListener("DOMContentLoaded", renderErrors);
+</script>
 <style>
 /* =========================================================
    millionalite — 薄暗い酒場のカードテーブル
@@ -79,7 +100,9 @@ body::before {
   z-index: 1;
   flex: 1 1 auto;
   flex-direction: column;
-  padding: 24px var(--gutter);
+  padding:
+    calc(24px + env(safe-area-inset-top)) calc(var(--gutter) + env(safe-area-inset-right))
+    calc(24px + env(safe-area-inset-bottom)) calc(var(--gutter) + env(safe-area-inset-left));
 }
 .screen.active { display: flex; }
 
@@ -176,8 +199,17 @@ body::before {
 }
 .btn-primary:hover { color: var(--gold-hi); border-color: var(--gold); }
 
+.start-status {
+  margin: 18px 0 0;
+  min-height: 1.2em;
+  font-size: 13px;
+  letter-spacing: .08em;
+  color: var(--gold-hi);
+  text-align: center;
+}
+
 .version {
-  margin-top: 30px;
+  margin-top: 14px;
   color: var(--ink-dim);
   font-size: 11px;
   letter-spacing: .16em;
@@ -237,6 +269,21 @@ body::before {
 #notepad { left: 12px; }
 body.in-run .corner { display: flex; }
 
+/* ---- エラーバー ---- */
+.errbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 40;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  font-size: 12px;
+  line-height: 1.5;
+  color: #ffd9d9;
+  background: rgba(70, 14, 14, .97);
+  border-bottom: 1px solid var(--blood-hi);
+  word-break: break-word;
+}
+.errbar[hidden] { display: none; }
+
 /* ---- 汎用 ---- */
 .screen-title {
   font-family: var(--font-title);
@@ -253,8 +300,8 @@ body.in-run .corner { display: flex; }
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 26px;
-  transform: translate(-50%, 12px);
+  top: calc(14px + env(safe-area-inset-top));
+  transform: translate(-50%, -12px);
   z-index: 20;
   max-width: min(420px, calc(100vw - 2 * var(--gutter)));
   padding: 11px 18px;
@@ -292,7 +339,16 @@ body.in-run .corner { display: flex; }
     <button class="btn" id="btn-achievements" disabled>実績</button>
     <button class="btn" id="btn-settings" disabled>設定</button>
   </nav>
-  <p class="version">PHASE 0 &mdash; SETUP</p>
+  <p class="start-status" id="start-status" role="status" aria-live="polite"></p>
+  <p class="version" id="version">PHASE 0 &mdash; SETUP &middot; BUILD 3 &middot; JS: &mdash;</p>
+  <script>
+  /* 下の起動スクリプトが動かない環境でもボタンが反応するよう、ここで直接つないでおく */
+  document.getElementById("btn-start").addEventListener("click", function () {
+    if (typeof startRun === "function") { startRun(); return; }
+    var status = document.getElementById("start-status");
+    if (status) status.textContent = "起動スクリプトを読み込めていません。ページを再読み込みしてください。";
+  });
+  </script>
 </section>
 
 <!-- ============ ゲーム画面（骨組みのみ） ============ -->
@@ -319,6 +375,8 @@ body.in-run .corner { display: flex; }
 <section id="screen-gameover" class="screen"><div class="stack"><h2 class="screen-title">GAME OVER</h2><p class="muted">Phase 2 で実装</p></div></section>
 <section id="screen-clear" class="screen"><div class="stack"><h2 class="screen-title">CLEAR</h2><p class="muted">Phase 2 で実装</p></div></section>
 
+<div class="errbar" id="errbar" hidden></div>
+
 <!-- ============ 常駐UI（Phase 7） ============ -->
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="corner" id="notepad" title="ログ">&#128220;</div>
@@ -326,6 +384,7 @@ body.in-run .corner { display: flex; }
 
 <script>
 "use strict";
+
 /* =========================================================
    millionalite
    仕様は SPEC.md を参照。単一ファイル / 外部ライブラリなし。
@@ -352,12 +411,14 @@ const DEFAULT_SAVE = {
   settings: { bgm: 0.6, se: 0.6, handStyle: "fan" }
 };
 
+function clone(obj) { return JSON.parse(JSON.stringify(obj)); }
+
 const Save = {
-  data: structuredClone(DEFAULT_SAVE),
+  data: clone(DEFAULT_SAVE),
   load() {
     try {
       const raw = localStorage.getItem(SAVE_KEY);
-      if (raw) this.data = Object.assign(structuredClone(DEFAULT_SAVE), JSON.parse(raw));
+      if (raw) this.data = Object.assign(clone(DEFAULT_SAVE), JSON.parse(raw));
     } catch (e) {
       console.warn("セーブデータを読めませんでした。初期値で開始します。", e);
     }
@@ -398,6 +459,8 @@ function showScreen(name) {
   window.scrollTo(0, 0);
 }
 
+var startPressCount = 0; // 本体が途中で落ちても参照できるよう var
+
 /* ---------- トースト（押した手応えを画面に出す） ---------- */
 let toastTimer = null;
 function showToast(message, ms = 2200) {
@@ -433,18 +496,30 @@ function checkAchievements() { /* Phase 7 */ }
 
 function startRun() {
   console.log("start");
+  const status = document.getElementById("start-status");
+  if (status) status.textContent = "ゲーム開始 — 対局は Phase 1 で実装します（" + (startPressCount = (startPressCount || 0) + 1) + "回目）";
   showToast("ゲーム開始 — 対局は Phase 1 で実装します");
   // Phase 1 以降でここからラウンド1を開始する
 }
 
 /* ---------- 起動 ---------- */
 function init() {
-  Save.load();
-  document.getElementById("btn-start").addEventListener("click", startRun);
+  try {
+    Save.load();
+  } catch (e) {
+    showError("セーブ読み込み: " + e.message);
+  }
   showScreen("title");
+  const version = document.getElementById("version");
+  if (version) version.textContent = "PHASE 0 — SETUP · BUILD 3 · JS: OK";
 }
 
-document.addEventListener("DOMContentLoaded", init);
+/* DOMContentLoaded を待たずに済むよう、読み込み済みならその場で実行 */
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}
 </script>
 </body>
 </html>
