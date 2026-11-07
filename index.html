@@ -210,10 +210,10 @@ body::before {
 
 .version {
   margin-top: 14px;
-  color: var(--ink-dim);
+  color: var(--gold-dim);
   font-size: 11px;
   letter-spacing: .16em;
-  opacity: .6;
+  opacity: .85;
 }
 
 /* ---- ゲーム画面の骨組み（Phase 1以降で中身を実装） ---- */
@@ -442,7 +442,7 @@ body.in-run .corner { display: flex; }
     <button class="btn" id="btn-settings" disabled>設定</button>
   </nav>
   <p class="start-status" id="start-status" role="status" aria-live="polite"></p>
-  <p class="version" id="version">PHASE 1 &mdash; 大富豪エンジン &middot; BUILD 4 &middot; JS: &mdash;</p>
+  <p class="version" id="version">v0.2.0 &middot; 読み込み中&hellip;</p>
   <script>
   /* 下の起動スクリプトが動かない環境でもボタンが反応するよう、ここで直接つないでおく */
   document.getElementById("btn-start").addEventListener("click", function () {
@@ -528,6 +528,10 @@ const SEAL_PRICES = [15, 25, 35, 45];
 const LAUNDRY_BASE = 20, LAUNDRY_STEP = 5;     // 20 + 5×(枚数-1) の累積式
 const SAVE_KEY = "millionalite.save.v1";
 
+/* バージョン表記。Phase N 完了ごとに v0.(N+1).0 を上げる */
+const VERSION = "v0.2.0";
+const PHASE_LABEL = "PHASE 1 — 大富豪エンジン";
+
 /* ---------- 永続データ（localStorage） ---------- */
 const DEFAULT_SAVE = {
   unlockedDecks: ["standard_blue"],
@@ -569,8 +573,8 @@ const state = {
   wave: 0,
   coins: 0,
   phase: "idle",   // idle / playing / ended
-  players: [],     // 0 = プレイヤー, 1〜3 = CPU
-  drawPile: [],    // 配り残り（Phase 1 では未使用）
+  players: [],     // 0 = プレイヤー, 1〜3 = CPU（各自が自分の山札を持つ）
+  playerDeck: [],  // プレイヤーのデッキ。ラン中ずっと保持する
   field: null,     // { card, owner } 場のカード
   turn: 0,
   selectedId: null,
@@ -623,18 +627,31 @@ function cardName(card) {
   return card.joker ? "JOKER" : card.suit + rankLabel(card);
 }
 
-/* 52枚 + ジョーカー1枚 */
-function buildDeck() {
+/* カードは1枚ごとに通し番号を持つ（シールや強化を個別に載せるため） */
+let cardUid = 0;
+function makeCard(suit, rank, joker) {
+  return { id: ++cardUid, suit: suit, rank: rank, joker: !!joker };
+}
+
+/* 通常のトランプ52枚（+ ジョーカー1枚） */
+function buildStandardDeck(withJoker) {
   const deck = [];
-  let id = 0;
   for (const suit of SUITS) {
     for (let rank = 3; rank <= 15; rank++) {   // 15 = 「2」
-      deck.push({ id: id++, suit: suit, rank: rank, joker: false });
+      deck.push(makeCard(suit, rank, false));
     }
   }
-  deck.push({ id: id++, suit: null, rank: 16, joker: true });
+  if (withJoker) deck.push(makeCard(null, 16, true));
   return deck;
 }
+
+/* プレイヤーのデッキ（スタンダード・ブルー = 52枚 + ジョーカー1枚）。
+   ラン中ずっと保持し、Phase 3 以降で購入カードが加わる */
+function buildPlayerDeck() { return buildStandardDeck(true); }
+
+/* CPUのデッキ。1人1デッキで、1〜5Rは普通のトランプ52枚（SPEC 第XIII章）。
+   6R以降の特殊カード混入は Phase 5 で実装 */
+function buildCpuDeck() { return buildStandardDeck(false); }
 
 /* フィッシャー–イェーツ */
 function shuffle(cards) {
@@ -662,19 +679,18 @@ let cpuTimer = null;
 
 function startRound() {
   clearTimeout(cpuTimer);
-  const deck = shuffle(buildDeck());
 
   state.players = PLAYER_NAMES.map(function (name, i) {
-    return { index: i, name: name, isCPU: i !== 0, hand: [], passed: false, rank: null };
+    return { index: i, name: name, isCPU: i !== 0, hand: [], library: [], passed: false, rank: null };
   });
 
-  // ラウンド開始時に9枚配るのみ。ウェーブごとの補充はしない（SPEC）
-  for (let n = 0; n < HAND_SIZE; n++) {
-    for (const player of state.players) player.hand.push(deck.pop());
+  // 山札は1人1デッキ。自分の山札をシャッフルして上から9枚取る。
+  // 配るのはラウンド開始時のみで、ウェーブごとの補充はしない（SPEC）
+  for (const player of state.players) {
+    const library = shuffle(player.index === 0 ? state.playerDeck.slice() : buildCpuDeck());
+    player.hand = sortHand(library.splice(0, HAND_SIZE));
+    player.library = library;
   }
-  for (const player of state.players) sortHand(player.hand);
-
-  state.drawPile = deck;
   state.field = null;
   state.wave = 1;
   state.turn = 0;
@@ -880,7 +896,7 @@ function renderOpponents() {
       info.textContent = "パス（手札 " + player.hand.length + "）";
     } else {
       info.className = "opp-state";
-      info.textContent = "手札 " + player.hand.length + " 枚";
+      info.textContent = "手札 " + player.hand.length + " ／ 山札 " + player.library.length;
     }
 
     el.appendChild(name);
@@ -921,7 +937,7 @@ function renderHand() {
   const label = document.getElementById("ui-hand-label");
   const me = state.players[0];
   hand.textContent = "";
-  label.textContent = "自分の手札（" + me.hand.length + " 枚）";
+  label.textContent = "自分の手札 " + me.hand.length + " 枚　／　山札 " + me.library.length + " 枚";
 
   for (const card of me.hand) {
     hand.appendChild(cardElement(card, {
@@ -976,6 +992,7 @@ function startRun() {
   console.log("start");
   state.round = 1;     // 21ラウンド進行は Phase 2
   state.coins = 0;
+  state.playerDeck = buildPlayerDeck();
   startRound();
 }
 
@@ -997,7 +1014,7 @@ function init() {
   });
   showScreen("title");
   const version = document.getElementById("version");
-  if (version) version.textContent = "PHASE 1 — 大富豪エンジン · BUILD 4 · JS: OK";
+  if (version) version.textContent = VERSION + " · " + PHASE_LABEL;
 }
 
 /* DOMContentLoaded を待たずに済むよう、読み込み済みならその場で実行 */
