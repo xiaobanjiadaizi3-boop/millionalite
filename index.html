@@ -246,8 +246,110 @@ body::before {
   min-height: 220px;
 }
 
+.board .field-slot { display: flex; gap: 8px; align-items: center; justify-content: center; min-height: 104px; }
+.board .turn-note { margin: 12px 0 0; font-size: 13px; letter-spacing: .08em; color: var(--ink-dim); }
+.board .inner { text-align: center; }
+.board .empty-note { color: var(--ink-dim); font-size: 13px; letter-spacing: .1em; }
+
+/* ---- 対戦相手 ---- */
+.opponents { display: flex; gap: 8px; margin-top: 12px; }
+.opp {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 9px 6px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--bg-raise);
+}
+.opp.turn { border-color: var(--gold); box-shadow: 0 0 14px rgba(201,169,97,.2); }
+.opp.out { opacity: .45; }
+.opp .opp-name { font-size: 12px; letter-spacing: .06em; color: var(--ink); }
+.opp .opp-state { display: block; margin-top: 3px; font-size: 11px; color: var(--ink-dim); }
+.opp .opp-state.rank { color: var(--gold); }
+.opp .opp-state.passed { color: var(--blood-hi); }
+
+/* ---- カード ---- */
+.hand-area { margin-top: 14px; }
+.hand-label { margin: 0 0 6px; font-size: 12px; letter-spacing: .1em; color: var(--ink-dim); text-align: center; }
 .hand { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; min-height: 92px; }
 .actions { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+.actions .btn { min-width: 120px; }
+
+.card {
+  position: relative;
+  width: 50px;
+  height: 72px;
+  padding: 5px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-body);
+  color: #1b1510;
+  background: linear-gradient(170deg, #f3e9d2, #d9cbac);
+  border: 1px solid #0d0a06;
+  border-radius: 5px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.55);
+  cursor: default;
+  touch-action: manipulation;
+  transition: transform .12s, box-shadow .12s, filter .12s;
+}
+.card .card-rank { font-size: 17px; font-weight: 700; line-height: 1; }
+.card .card-suit { font-size: 17px; line-height: 1; }
+.card.red { color: #9c2020; }
+.card.joker {
+  color: #4a3a12;
+  background: linear-gradient(170deg, #f6e4a8, #c9a961);
+}
+.card.joker .card-rank { font-size: 11px; letter-spacing: .04em; }
+.card.joker .card-suit { font-size: 15px; }
+
+button.card { cursor: pointer; }
+button.card:disabled { filter: grayscale(.65) brightness(.72); cursor: not-allowed; }
+button.card:not(:disabled):hover { transform: translateY(-5px); }
+.card.selected {
+  transform: translateY(-12px);
+  box-shadow: 0 0 0 2px var(--gold), 0 6px 14px rgba(0,0,0,.6);
+}
+.card.field { width: 58px; height: 84px; }
+.card.field .card-rank, .card.field .card-suit { font-size: 20px; }
+
+/* ---- ラウンド終了のオーバーレイ ---- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--gutter);
+  background: rgba(5, 4, 2, .88);
+}
+.overlay[hidden] { display: none; }
+.overlay-box {
+  width: min(360px, 100%);
+  padding: 22px 18px;
+  text-align: center;
+  background: var(--bg-panel);
+  border: 1px solid var(--gold-dim);
+  border-radius: 4px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.7);
+}
+.rank-list { list-style: none; margin: 14px 0 18px; padding: 0; }
+.rank-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 4px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.rank-list li:last-child { border-bottom: 0; }
+.rank-list .title { color: var(--gold); letter-spacing: .08em; }
+.rank-list li.me .name { color: var(--gold-hi); }
+.overlay-box .btn + .btn { margin-top: 10px; }
+.overlay-box .btn { width: 100%; }
 
 /* ---- 右下のアライグマ / 左下のメモ帳（Phase 7で中身を実装） ---- */
 .corner {
@@ -340,7 +442,7 @@ body.in-run .corner { display: flex; }
     <button class="btn" id="btn-settings" disabled>設定</button>
   </nav>
   <p class="start-status" id="start-status" role="status" aria-live="polite"></p>
-  <p class="version" id="version">PHASE 0 &mdash; SETUP &middot; BUILD 3 &middot; JS: &mdash;</p>
+  <p class="version" id="version">PHASE 1 &mdash; 大富豪エンジン &middot; BUILD 4 &middot; JS: &mdash;</p>
   <script>
   /* 下の起動スクリプトが動かない環境でもボタンが反応するよう、ここで直接つないでおく */
   document.getElementById("btn-start").addEventListener("click", function () {
@@ -351,18 +453,40 @@ body.in-run .corner { display: flex; }
   </script>
 </section>
 
-<!-- ============ ゲーム画面（骨組みのみ） ============ -->
+<!-- ============ ゲーム画面 ============ -->
 <section id="screen-game" class="screen">
   <header class="topbar">
     <span>ROUND <b id="ui-round">-</b> / 21</span>
     <span>WAVE <b id="ui-wave">-</b></span>
     <span class="coin">&#9679; <b id="ui-coins">0</b></span>
   </header>
-  <div class="board" id="ui-board">— 場 —</div>
-  <div class="hand" id="ui-hand"></div>
+
+  <div class="opponents" id="ui-opponents"></div>
+
+  <div class="board">
+    <div class="inner">
+      <div class="field-slot" id="ui-field"></div>
+      <p class="turn-note" id="ui-turn">&mdash;</p>
+    </div>
+  </div>
+
+  <div class="hand-area">
+    <p class="hand-label" id="ui-hand-label">自分の手札</p>
+    <div class="hand" id="ui-hand"></div>
+  </div>
+
   <div class="actions">
     <button class="btn" id="btn-play" disabled>出す</button>
     <button class="btn" id="btn-pass" disabled>パス</button>
+  </div>
+
+  <div class="overlay" id="ui-roundend" hidden>
+    <div class="overlay-box">
+      <h2 class="screen-title">ラウンド終了</h2>
+      <ol class="rank-list" id="ui-ranklist"></ol>
+      <button class="btn btn-primary" id="btn-again">もう一度</button>
+      <button class="btn" id="btn-title">タイトルへ</button>
+    </div>
   </div>
 </section>
 
@@ -433,19 +557,26 @@ const Save = {
   }
 };
 
-/* ---------- ランの状態（Phase 1以降で中身が埋まる） ---------- */
+/* ---------- ランの状態 ---------- */
+const PLAYER_NAMES = ["あなた", "CPU 甲", "CPU 乙", "CPU 丙"];
+const RANK_TITLES = ["大富豪", "富豪", "貧民", "大貧民"];
+const CPU_DELAY = 750;  // CPUの思考待ち（ミリ秒）
+
 const state = {
   screen: "title",
   deckId: "standard_blue",
   round: 0,
   wave: 0,
   coins: 0,
-  deck: [],        // プレイヤーの山札
-  hands: [[], [], [], []], // 0 = プレイヤー, 1〜3 = CPU
-  field: null,     // 場のカード
-  ranks: [],       // 上がった順
-  marks: {},       // マークの素 → パッシブ
-  consumables: [], // 最大4個
+  phase: "idle",   // idle / playing / ended
+  players: [],     // 0 = プレイヤー, 1〜3 = CPU
+  drawPile: [],    // 配り残り（Phase 1 では未使用）
+  field: null,     // { card, owner } 場のカード
+  turn: 0,
+  selectedId: null,
+  finished: [],    // 上がった順のプレイヤー番号
+  marks: {},       // マークの素 → パッシブ（Phase 4）
+  consumables: [], // 最大4個（Phase 6）
   log: []
 };
 
@@ -458,8 +589,6 @@ function showScreen(name) {
   state.screen = name;
   window.scrollTo(0, 0);
 }
-
-var startPressCount = 0; // 本体が途中で落ちても参照できるよう var
 
 /* ---------- トースト（押した手応えを画面に出す） ---------- */
 let toastTimer = null;
@@ -478,16 +607,365 @@ function logEvent(text) {
   console.log("[log]", text);
 }
 
+/* =========================================================
+   Phase 1: 大富豪エンジン
+   強さは 3 < 4 < ... < A(14) < 2(15) < JOKER(16) の数値で持つ
+   ========================================================= */
+
+const RANK_LABELS = { 11: "J", 12: "Q", 13: "K", 14: "A", 15: "2" };
+
+function rankLabel(card) {
+  if (card.joker) return "JOKER";
+  return RANK_LABELS[card.rank] || String(card.rank);
+}
+
+function cardName(card) {
+  return card.joker ? "JOKER" : card.suit + rankLabel(card);
+}
+
+/* 52枚 + ジョーカー1枚 */
+function buildDeck() {
+  const deck = [];
+  let id = 0;
+  for (const suit of SUITS) {
+    for (let rank = 3; rank <= 15; rank++) {   // 15 = 「2」
+      deck.push({ id: id++, suit: suit, rank: rank, joker: false });
+    }
+  }
+  deck.push({ id: id++, suit: null, rank: 16, joker: true });
+  return deck;
+}
+
+/* フィッシャー–イェーツ */
+function shuffle(cards) {
+  for (let i = cards.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = cards[i];
+    cards[i] = cards[j];
+    cards[j] = tmp;
+  }
+  return cards;
+}
+
+function sortHand(hand) {
+  const suitOrder = { "♥": 0, "♠": 1, "♦": 2, "♣": 3 };
+  hand.sort(function (a, b) {
+    if (a.rank !== b.rank) return a.rank - b.rank;
+    return (suitOrder[a.suit] || 0) - (suitOrder[b.suit] || 0);
+  });
+  return hand;
+}
+
+/* ---------- ラウンド進行 ---------- */
+
+let cpuTimer = null;
+
+function startRound() {
+  clearTimeout(cpuTimer);
+  const deck = shuffle(buildDeck());
+
+  state.players = PLAYER_NAMES.map(function (name, i) {
+    return { index: i, name: name, isCPU: i !== 0, hand: [], passed: false, rank: null };
+  });
+
+  // ラウンド開始時に9枚配るのみ。ウェーブごとの補充はしない（SPEC）
+  for (let n = 0; n < HAND_SIZE; n++) {
+    for (const player of state.players) player.hand.push(deck.pop());
+  }
+  for (const player of state.players) sortHand(player.hand);
+
+  state.drawPile = deck;
+  state.field = null;
+  state.wave = 1;
+  state.turn = 0;
+  state.selectedId = null;
+  state.finished = [];
+  state.phase = "playing";
+
+  document.getElementById("ui-roundend").hidden = true;
+  logEvent("ラウンド " + state.round + " 開始");
+  showScreen("game");
+  render();
+  scheduleCpu();
+}
+
+function activePlayers() {
+  return state.players.filter(function (p) { return p.rank === null; });
+}
+
+/* 出せるか: 場が空なら何でも、あれば「より強い数字1枚」のみ（シングル） */
+function canPlay(card) {
+  if (!state.field) return true;
+  return card.rank > state.field.card.rank;
+}
+
+function playCard(player, card) {
+  player.hand = player.hand.filter(function (c) { return c.id !== card.id; });
+  state.field = { card: card, owner: player.index };
+  logEvent(player.name + " が " + cardName(card) + " を出した");
+  if (player.hand.length === 0) finishPlayer(player);
+  afterAction();
+}
+
+function passTurn(player) {
+  player.passed = true;
+  logEvent(player.name + " がパス");
+  afterAction();
+}
+
+function finishPlayer(player) {
+  player.rank = state.finished.length + 1;
+  state.finished.push(player.index);
+  logEvent(player.name + " が上がり（" + RANK_TITLES[player.rank - 1] + "）");
+}
+
+function afterAction() {
+  state.selectedId = null;
+
+  if (activePlayers().length <= 1) { endRound(); return; }
+
+  if (shouldClearField()) endWave();
+  else advanceTurn();
+
+  render();
+  scheduleCpu();
+}
+
+/* 場に出した本人以外が全員パス（または上がり）なら場が流れる */
+function shouldClearField() {
+  if (!state.field) return false;
+  const contenders = state.players.filter(function (p) { return p.rank === null && !p.passed; });
+  if (contenders.length === 0) return true;
+  return contenders.length === 1 && contenders[0].index === state.field.owner;
+}
+
+function endWave() {
+  const owner = state.field ? state.field.owner : state.turn;
+  state.field = null;
+  state.wave++;
+  state.players.forEach(function (p) { p.passed = false; });
+  // 最後に出した人から。上がっていれば次の生存者から
+  state.turn = state.players[owner].rank === null ? owner : nextActiveFrom(owner);
+  logEvent("場が流れた（ウェーブ " + state.wave + "）");
+}
+
+function nextActiveFrom(from) {
+  for (let i = 1; i <= state.players.length; i++) {
+    const idx = (from + i) % state.players.length;
+    if (state.players[idx].rank === null) return idx;
+  }
+  return from;
+}
+
+function advanceTurn() {
+  for (let i = 1; i <= state.players.length; i++) {
+    const idx = (state.turn + i) % state.players.length;
+    const p = state.players[idx];
+    if (p.rank === null && !p.passed) { state.turn = idx; return; }
+  }
+}
+
+function endRound() {
+  clearTimeout(cpuTimer);
+  const last = state.players.find(function (p) { return p.rank === null; });
+  if (last) finishPlayer(last);   // 残った1人が大貧民
+  state.phase = "ended";
+  logEvent("ラウンド終了");
+  render();
+  showRoundEnd();
+}
+
+/* ---------- CPU（超簡易AI: 出せる中で最弱、出せなければパス） ---------- */
+
+function scheduleCpu() {
+  clearTimeout(cpuTimer);
+  if (state.phase !== "playing") return;
+  const player = state.players[state.turn];
+  if (!player || !player.isCPU) return;
+  cpuTimer = setTimeout(cpuTurn, CPU_DELAY);
+}
+
+function cpuTurn() {
+  if (state.phase !== "playing") return;
+  const player = state.players[state.turn];
+  if (!player || !player.isCPU || player.rank !== null) return;
+  const playable = player.hand.filter(canPlay);   // 手札は弱い順に並んでいる
+  if (playable.length > 0) playCard(player, playable[0]);
+  else passTurn(player);
+}
+
+/* ---------- プレイヤーの操作 ---------- */
+
+function isMyTurn() {
+  return state.phase === "playing" && state.turn === 0 && state.players[0] && state.players[0].rank === null;
+}
+
+function selectCard(cardId) {
+  if (!isMyTurn()) return;
+  state.selectedId = state.selectedId === cardId ? null : cardId;
+  render();
+}
+
+function onPlay() {
+  if (!isMyTurn() || state.selectedId === null) return;
+  const me = state.players[0];
+  const card = me.hand.find(function (c) { return c.id === state.selectedId; });
+  if (!card || !canPlay(card)) return;
+  playCard(me, card);
+}
+
+function onPass() {
+  if (!isMyTurn() || !state.field) return;   // 場が空のときはパスできない
+  passTurn(state.players[0]);
+}
+
+/* ---------- 描画 ---------- */
+
+function cardElement(card, options) {
+  const opts = options || {};
+  const el = document.createElement(opts.clickable ? "button" : "div");
+  el.className = "card" + (card.joker ? " joker" : (card.suit === "♥" || card.suit === "♦" ? " red" : ""));
+  if (opts.extraClass) el.className += " " + opts.extraClass;
+
+  const rank = document.createElement("span");
+  rank.className = "card-rank";
+  rank.textContent = rankLabel(card);
+  const suit = document.createElement("span");
+  suit.className = "card-suit";
+  suit.textContent = card.joker ? "★" : card.suit;
+  el.appendChild(rank);
+  el.appendChild(suit);
+
+  if (opts.clickable) {
+    el.type = "button";
+    el.disabled = !!opts.disabled;
+    el.setAttribute("aria-pressed", opts.selected ? "true" : "false");
+    el.setAttribute("aria-label", cardName(card));
+    el.addEventListener("click", function () { selectCard(card.id); });
+  }
+  return el;
+}
+
+function render() {
+  if (!state.players.length) return;
+  document.getElementById("ui-round").textContent = String(state.round);
+  document.getElementById("ui-wave").textContent = String(state.wave);
+  document.getElementById("ui-coins").textContent = String(state.coins);
+  renderOpponents();
+  renderField();
+  renderHand();
+  renderActions();
+}
+
+function renderOpponents() {
+  const box = document.getElementById("ui-opponents");
+  box.textContent = "";
+  for (const player of state.players) {
+    if (player.index === 0) continue;
+    const el = document.createElement("div");
+    el.className = "opp";
+    if (state.phase === "playing" && state.turn === player.index) el.className += " turn";
+    if (player.rank !== null) el.className += " out";
+
+    const name = document.createElement("span");
+    name.className = "opp-name";
+    name.textContent = player.name;
+
+    const info = document.createElement("span");
+    if (player.rank !== null) {
+      info.className = "opp-state rank";
+      info.textContent = RANK_TITLES[player.rank - 1];
+    } else if (player.passed) {
+      info.className = "opp-state passed";
+      info.textContent = "パス（手札 " + player.hand.length + "）";
+    } else {
+      info.className = "opp-state";
+      info.textContent = "手札 " + player.hand.length + " 枚";
+    }
+
+    el.appendChild(name);
+    el.appendChild(info);
+    box.appendChild(el);
+  }
+}
+
+function renderField() {
+  const slot = document.getElementById("ui-field");
+  slot.textContent = "";
+  if (state.field) {
+    slot.appendChild(cardElement(state.field.card, { extraClass: "field" }));
+  } else {
+    const note = document.createElement("p");
+    note.className = "empty-note";
+    note.textContent = "場は空 — 好きなカードを出せます";
+    slot.appendChild(note);
+  }
+
+  const turnNote = document.getElementById("ui-turn");
+  const me = state.players[0];
+  if (state.phase === "ended") {
+    turnNote.textContent = "ラウンド終了";
+  } else if (me && me.rank !== null) {
+    turnNote.textContent = "あなたは上がり（" + RANK_TITLES[me.rank - 1] + "）— 決着を待っています";
+  } else if (isMyTurn()) {
+    turnNote.textContent = state.field
+      ? "あなたの番 — " + cardName(state.field.card) + " より強い1枚、または パス"
+      : "あなたの番 — 好きな1枚を出してください";
+  } else {
+    turnNote.textContent = state.players[state.turn].name + " の番…";
+  }
+}
+
+function renderHand() {
+  const hand = document.getElementById("ui-hand");
+  const label = document.getElementById("ui-hand-label");
+  const me = state.players[0];
+  hand.textContent = "";
+  label.textContent = "自分の手札（" + me.hand.length + " 枚）";
+
+  for (const card of me.hand) {
+    hand.appendChild(cardElement(card, {
+      clickable: true,
+      selected: state.selectedId === card.id,
+      disabled: !isMyTurn() || !canPlay(card),
+      extraClass: state.selectedId === card.id ? "selected" : ""
+    }));
+  }
+  if (me.hand.length === 0) {
+    const note = document.createElement("p");
+    note.className = "empty-note";
+    note.textContent = "手札なし";
+    hand.appendChild(note);
+  }
+}
+
+function renderActions() {
+  const selected = state.selectedId !== null;
+  document.getElementById("btn-play").disabled = !isMyTurn() || !selected;
+  document.getElementById("btn-pass").disabled = !isMyTurn() || !state.field;
+}
+
+function showRoundEnd() {
+  const list = document.getElementById("ui-ranklist");
+  list.textContent = "";
+  const ordered = state.players.slice().sort(function (a, b) { return a.rank - b.rank; });
+  for (const player of ordered) {
+    const li = document.createElement("li");
+    if (player.index === 0) li.className = "me";
+    const title = document.createElement("span");
+    title.className = "title";
+    title.textContent = RANK_TITLES[player.rank - 1];
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = player.name;
+    li.appendChild(title);
+    li.appendChild(name);
+    list.appendChild(li);
+  }
+  document.getElementById("ui-roundend").hidden = false;
+}
+
 /* ---------- 以降のPhaseで実装する処理（空実装） ---------- */
-function buildDeck() { /* Phase 1 */ }
-function shuffle() { /* Phase 1 */ }
-function dealHands() { /* Phase 1 */ }
-function canPlay() { /* Phase 1 */ }
-function playCards() { /* Phase 1 */ }
-function passTurn() { /* Phase 1 */ }
-function cpuTurn() { /* Phase 1 */ }
-function endWave() { /* Phase 1 */ }
-function endRound() { /* Phase 2 */ }
 function openShop() { /* Phase 3 */ }
 function applyPassives() { /* Phase 4 */ }
 function setupBoss() { /* Phase 5 */ }
@@ -496,10 +974,9 @@ function checkAchievements() { /* Phase 7 */ }
 
 function startRun() {
   console.log("start");
-  const status = document.getElementById("start-status");
-  if (status) status.textContent = "ゲーム開始 — 対局は Phase 1 で実装します（" + (startPressCount = (startPressCount || 0) + 1) + "回目）";
-  showToast("ゲーム開始 — 対局は Phase 1 で実装します");
-  // Phase 1 以降でここからラウンド1を開始する
+  state.round = 1;     // 21ラウンド進行は Phase 2
+  state.coins = 0;
+  startRound();
 }
 
 /* ---------- 起動 ---------- */
@@ -509,9 +986,18 @@ function init() {
   } catch (e) {
     showError("セーブ読み込み: " + e.message);
   }
+  document.getElementById("btn-play").addEventListener("click", onPlay);
+  document.getElementById("btn-pass").addEventListener("click", onPass);
+  document.getElementById("btn-again").addEventListener("click", startRound);
+  document.getElementById("btn-title").addEventListener("click", function () {
+    clearTimeout(cpuTimer);
+    state.phase = "idle";
+    document.getElementById("ui-roundend").hidden = true;
+    showScreen("title");
+  });
   showScreen("title");
   const version = document.getElementById("version");
-  if (version) version.textContent = "PHASE 0 — SETUP · BUILD 3 · JS: OK";
+  if (version) version.textContent = "PHASE 1 — 大富豪エンジン · BUILD 4 · JS: OK";
 }
 
 /* DOMContentLoaded を待たずに済むよう、読み込み済みならその場で実行 */
