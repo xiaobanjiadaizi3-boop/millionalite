@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Unity を起動せずに Assets 配下のスクリプトを型チェックするためだけのプロジェクト。
+       dotnet build tools/UnityStubs
+       ここが通っても Unity 実機での動作保証にはならないが、綴り間違いや
+       シグネチャ不整合といったコンパイルエラーは事前に潰せる。 -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>UnityStubsCheck</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoWarn>CS0169;CS0414;CS0649;CS0067</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="UnityStubs.cs" />
+    <Compile Include="../../Assets/Scripts/Core/*.cs" />
+    <Compile Include="../../Assets/Scripts/Unity/*.cs" />
+  </ItemGroup>
+
+</Project>

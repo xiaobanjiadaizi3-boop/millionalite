@@ -1,0 +1,49 @@
+# ---- Unity ----
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Mm]emoryCaptures/
+[Uu]ser[Ss]ettings/
+/[Aa]ssets/[Aa]ssetStoreTools*
+/[Aa]ssets/StreamingAssets/aa.meta
+/[Aa]ssets/StreamingAssets/aa/*
+
+# Unity が生成するIDEファイル
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+.vs/
+.idea/
+.vscode/
+
+# ビルド成果物
+*.apk
+*.aab
+*.unitypackage
+*.app
+crashlytics-build.properties
+sysinfo.txt
+
+# ---- 検証用ツール（.NET）----
+# tools/*.csproj は追跡したいので、上の *.csproj より後に打ち消す
+!tools/**/*.csproj
+tools/**/bin/
+tools/**/obj/
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
